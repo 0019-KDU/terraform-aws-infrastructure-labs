@@ -101,3 +101,213 @@ Run:
 ```bash
 xcode-select --install
 ```
+
+## AWS CLI Installation
+
+Before creating resources, you need AWS CLI and credentials for Terraform to authenticate with AWS APIs.
+
+### Prerequisites
+
+1. **Create AWS Account**: Sign up for AWS free tier if you don't have an account
+2. **Install AWS CLI**: Download and install from AWS official website
+3. **Configure Credentials**: Set up your AWS access keys
+
+### Check System Architecture
+
+```bash
+# Linux/macOS
+uname -m
+
+# Windows PowerShell
+$env:PROCESSOR_ARCHITECTURE
+```
+
+Official Website: https://aws.amazon.com/cli/
+
+### Windows
+
+```powershell
+# Using MSI installer (recommended)
+# Download from: https://awscli.amazonaws.com/AWSCLIV2.msi
+
+# Using winget
+winget install Amazon.AWSCLI
+
+# Using chocolatey
+choco install awscli
+```
+
+### macOS
+
+```bash
+# Using official installer
+curl "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+sudo installer -pkg AWSCLIV2.pkg -target /
+
+# Using Homebrew
+brew install awscli
+```
+
+### Ubuntu / Debian
+
+```bash
+# Update package index
+sudo apt update
+
+# Install AWS CLI v2 (choose based on your architecture)
+# For x86_64
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+
+# For ARM64
+curl "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o "awscliv2.zip"
+
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Verify installation
+aws --version
+```
+
+## AWS Authentication
+
+### Authentication Methods
+
+| Method | Use Case | Security Level |
+|--------|----------|----------------|
+| AWS CLI Configuration | Local development | Medium |
+| Environment Variables | CI/CD pipelines | Medium |
+| IAM Roles | EC2 instances, ECS, Lambda | High |
+| AWS Profiles | Multiple accounts | Medium |
+| AWS SSO | Enterprise/Production | High |
+
+### Method 1: AWS CLI Configuration (Development)
+
+```bash
+aws configure
+```
+
+Enter your:
+- AWS Access Key ID
+- AWS Secret Access Key
+- Default region (e.g., `ap-south-1`)
+- Default output format (`json`)
+
+Credentials are stored in `~/.aws/credentials`.
+
+### Method 2: Environment Variables
+
+```bash
+# Linux/macOS
+export AWS_ACCESS_KEY_ID="your-access-key"
+export AWS_SECRET_ACCESS_KEY="your-secret-key"
+export AWS_DEFAULT_REGION="ap-south-1"
+
+# Windows PowerShell
+$env:AWS_ACCESS_KEY_ID="your-access-key"
+$env:AWS_SECRET_ACCESS_KEY="your-secret-key"
+$env:AWS_DEFAULT_REGION="ap-south-1"
+```
+
+### Method 3: AWS Profiles (Multiple Accounts)
+
+```bash
+# Configure named profile
+aws configure --profile dev
+aws configure --profile prod
+
+# Use specific profile
+export AWS_PROFILE=dev
+
+# Or in Terraform provider
+provider "aws" {
+  profile = "dev"
+  region  = "ap-south-1"
+}
+```
+
+### Method 4: IAM Roles (Production - Recommended)
+
+For EC2 instances, ECS tasks, or Lambda functions:
+
+```hcl
+provider "aws" {
+  region = "ap-south-1"
+  # No credentials needed - uses instance role automatically
+}
+```
+
+### Verify Authentication
+
+```bash
+# Check current identity
+aws sts get-caller-identity
+
+# List S3 buckets (test permissions)
+aws s3 ls
+```
+
+## Production Best Practices
+
+### Security
+
+- **Never commit credentials** to Git repositories
+- **Use IAM Roles** instead of access keys in production
+- **Enable MFA** for all IAM users
+- **Use least privilege** - grant minimum required permissions
+- **Rotate access keys** regularly (every 90 days)
+- **Use AWS Secrets Manager** for sensitive data
+- **Enable CloudTrail** for audit logging
+
+### Terraform State Management
+
+```hcl
+# Use remote backend for production
+terraform {
+  backend "s3" {
+    bucket         = "my-terraform-state-bucket"
+    key            = "prod/terraform.tfstate"
+    region         = "ap-south-1"
+    encrypt        = true
+    dynamodb_table = "terraform-state-lock"
+  }
+}
+```
+
+### Environment Separation
+
+```
+environments/
+├── dev/
+│   ├── main.tf
+│   └── terraform.tfvars
+├── staging/
+│   ├── main.tf
+│   └── terraform.tfvars
+└── prod/
+    ├── main.tf
+    └── terraform.tfvars
+```
+
+### CI/CD Pipeline Best Practices
+
+1. **Use OIDC** for GitHub Actions / GitLab CI authentication
+2. **Run `terraform plan`** on pull requests
+3. **Require approval** before `terraform apply` in production
+4. **Store state remotely** with locking enabled
+5. **Use workspaces** or separate state files per environment
+
+### Cost Management
+
+- Use **AWS Cost Explorer** to monitor spending
+- Set up **billing alerts** for budget thresholds
+- Tag all resources for cost allocation
+- Use **spot instances** for non-critical workloads
+- Enable **auto-scaling** to match demand
+- Regularly review and remove unused resources
+
+## Lessons
+
+| Lesson | Topic | Description |
+|--------|-------|-------------|
+| [Provider](lesson/provider/) | Terraform Providers | Understanding providers and version management |
+| [S3](lesson/s3/) | S3 Bucket | Creating and managing S3 buckets |
