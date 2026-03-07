@@ -305,9 +305,3 @@ environments/
 - Enable **auto-scaling** to match demand
 - Regularly review and remove unused resources
 
-## Lessons
-
-| Lesson | Topic | Description |
-|--------|-------|-------------|
-| [Provider](lesson/provider/) | Terraform Providers | Understanding providers and version management |
-| [S3](lesson/s3/) | S3 Bucket | Creating and managing S3 buckets |
