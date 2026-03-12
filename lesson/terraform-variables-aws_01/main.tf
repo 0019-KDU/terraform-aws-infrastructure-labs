@@ -51,9 +51,9 @@ locals {
   }
 }
 
-########################
+
 # Resource
-########################
+
 
 resource "aws_instance" "web" {
 
@@ -68,9 +68,9 @@ resource "aws_instance" "web" {
   )
 }
 
-########################
+
 # Outputs
-########################
+
 
 output "instance_id" {
   description = "EC2 instance ID"
