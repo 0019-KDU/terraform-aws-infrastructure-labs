@@ -1,8 +1,23 @@
-# Terraform Variables Demo
+# Terraform Variables
 
-A simple demo showing the three types of Terraform variables using a basic S3 bucket.
+A comprehensive guide to understanding and using Terraform variables to parameterize your infrastructure configurations.
 
 ![Terraform Variables](../../images/variable.png)
+
+---
+
+## 📖 Background
+
+The `variable` block is similar to a function argument in other programming languages. Input variables let you customize Terraform modules without altering their source code. Variables serve as parameters for modules, making them **composable** and **reusable**.
+
+You can define variables in:
+
+| Module Type | How Values Are Set |
+|-------------|-------------------|
+| **Root modules** | CLI options, environment variables, variable definition files, or HCP Terraform workspace |
+| **Child modules** | Parent module passes values as arguments to the `module` block |
+
+---
 
 ## 🎯 Three Types of Variables
 
@@ -27,7 +42,7 @@ locals {
     Project     = "Terraform-Demo"
   }
 
-  full_bucket_name = "${var.environment}-${var.bucket_name}-${random_string.suffix.result}"
+  resource_prefix = "${var.environment}-${var.project_name}"
 }
 ```
 
@@ -35,9 +50,9 @@ locals {
 Values returned after deployment - like function return values
 
 ```hcl
-output "bucket_name" {
-  description = "Name of the S3 bucket"
-  value       = aws_s3_bucket.demo.bucket
+output "resource_id" {
+  description = "The ID of the created resource"
+  value       = aws_instance.example.id
 }
 ```
 
@@ -46,7 +61,18 @@ output "bucket_name" {
 ## 📥 Understanding Input Variables in Detail
 
 ### What are Input Variables?
-Input variables are like function parameters - they allow you to customize your Terraform configuration without hardcoding values.
+Input variables allow you to customize your Terraform configuration without hardcoding values. They make your modules reusable across different environments and use cases.
+
+### Variable Block Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `description` | Documents the variable's purpose |
+| `type` | Specifies the type constraint (string, number, bool, list, map, object) |
+| `default` | Default value if none is provided |
+| `validation` | Custom validation rules |
+| `sensitive` | Marks variable as sensitive (hides from output) |
+| `nullable` | Whether the variable can be null |
 
 ### Basic Input Variable Structure
 
@@ -55,6 +81,7 @@ variable "variable_name" {
   description = "What this variable is for"
   type        = string
   default     = "default_value"  # Optional
+  sensitive   = false            # Optional
 }
 ```
 
@@ -63,23 +90,23 @@ variable "variable_name" {
 ```hcl
 # Define in variables.tf
 variable "environment" {
-  description = "Environment name"
+  description = "Environment name (dev, staging, prod)"
   type        = string
   default     = "staging"
 }
 
-variable "bucket_name" {
-  description = "S3 bucket name"
+variable "instance_type" {
+  description = "EC2 instance type"
   type        = string
-  default     = "my-terraform-bucket"
+  default     = "t2.micro"
 }
 
 # Reference with var. prefix in main.tf
-resource "aws_s3_bucket" "demo" {
-  bucket = var.bucket_name  # Using input variable
+resource "aws_instance" "example" {
+  instance_type = var.instance_type
 
   tags = {
-    Environment = var.environment  # Using input variable
+    Environment = var.environment
   }
 }
 ```
@@ -97,8 +124,8 @@ variable "environment" {
 **2. terraform.tfvars file (auto-loaded)**
 
 ```hcl
-environment = "demo"
-bucket_name = "terraform-demo-bucket"
+environment   = "demo"
+instance_type = "t2.small"
 ```
 
 **3. Command line**
@@ -119,7 +146,16 @@ terraform plan
 ## 📤 Understanding Output Variables in Detail
 
 ### What are Output Variables?
-Output variables are like function return values - they display important information after Terraform creates your infrastructure.
+Output variables display important information after Terraform creates your infrastructure. They can also be used to pass data between modules.
+
+### Output Block Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `description` | Documents the output's purpose |
+| `value` | The value to output (required) |
+| `sensitive` | Marks output as sensitive |
+| `depends_on` | Explicit dependencies |
 
 ### Basic Output Variable Structure
 
@@ -132,27 +168,25 @@ output "output_name" {
 
 ### How to Use Output Variables
 
-Define in output.tf
-
 ```hcl
 # Output a resource attribute
-output "bucket_name" {
-  description = "Name of the S3 bucket"
-  value       = aws_s3_bucket.demo.bucket
+output "instance_id" {
+  description = "ID of the EC2 instance"
+  value       = aws_instance.example.id
 }
 
-output "bucket_arn" {
-  description = "ARN of the S3 bucket"
-  value       = aws_s3_bucket.demo.arn
+output "instance_public_ip" {
+  description = "Public IP of the EC2 instance"
+  value       = aws_instance.example.public_ip
 }
 
-# Output an input variable (to confirm what was used)
+# Output an input variable
 output "environment" {
   description = "Environment from input variable"
   value       = var.environment
 }
 
-# Output a local variable (to see computed values)
+# Output a local variable
 output "tags" {
   description = "Tags from local variable"
   value       = local.common_tags
@@ -161,162 +195,71 @@ output "tags" {
 
 ### Viewing Outputs
 
-After running terraform apply, you can view outputs:
-
 ```bash
 terraform output                    # Show all outputs
-terraform output bucket_name        # Show specific output
+terraform output instance_id        # Show specific output
 terraform output -json              # Show all outputs in JSON format
 ```
 
-Example output:
-
-```
-bucket_arn = "arn:aws:s3:::demo-terraform-demo-bucket-abc123"
-bucket_name = "demo-terraform-demo-bucket-abc123"
-environment = "demo"
-tags = {
-  "Environment" = "demo"
-  "Owner" = "DevOps-Team"
-  "Project" = "Terraform-Demo"
-}
-```
-
 ---
 
-## 🏗️ What This Creates
+## 🚀 Variable Precedence
 
-Just one simple S3 bucket that demonstrates all three variable types:
+Terraform loads variables in the following order (later sources override earlier ones):
 
-- Uses **input variables** for environment and bucket name
-- Uses **local variables** for computed bucket name and tags
-- Uses **output variables** to show the created bucket details
+| Priority | Source | Example |
+|----------|--------|---------|
+| 1 (Lowest) | Default values | `default = "staging"` in variables.tf |
+| 2 | Environment variables | `export TF_VAR_environment="dev"` |
+| 3 | terraform.tfvars | Auto-loaded file |
+| 4 | *.auto.tfvars | Auto-loaded files (alphabetical order) |
+| 5 | -var-file | `terraform plan -var-file="prod.tfvars"` |
+| 6 (Highest) | -var flag | `terraform plan -var="environment=prod"` |
 
----
-
-## 🚀 Variable Precedence Testing
-
-### 1. Default Values (temporarily hide terraform.tfvars)
+### Testing Precedence
 
 ```bash
+# 1. Default Values (temporarily hide terraform.tfvars)
 mv terraform.tfvars terraform.tfvars.backup
 terraform plan
-# Uses: environment = "staging" (from variables.tf default)
-mv terraform.tfvars.backup terraform.tfvars  # restore
-```
-
-### 2. Using terraform.tfvars (automatically loaded)
-
-```bash
-terraform plan
-# Uses: environment = "demo" (from terraform.tfvars)
-```
-
-### 3. Command Line Override (highest precedence)
-
-```bash
-terraform plan -var="environment=production"
-# Overrides tfvars: environment = "production"
-```
-
-### 4. Environment Variables
-
-```bash
-export TF_VAR_environment="staging-from-env"
-terraform plan
-# Uses environment variable (but command line still wins)
-```
-
-### 5. Using Different tfvars Files
-
-```bash
-terraform plan -var-file="dev.tfvars"        # environment = "development"
-terraform plan -var-file="production.tfvars"  # environment = "production"
-```
-
----
-
-## 📁 Simple File Structure
-
-```
-├── main.tf           # S3 bucket resource
-├── variables.tf      # Input variables (2 simple variables)
-├── locals.tf         # Local variables (tags and computed name)
-├── output.tf         # Output variables (bucket details)
-├── provider.tf       # AWS provider
-├── terraform.tfvars  # Default variable values
-└── README.md         # This file
-```
-
----
-
-## 🧪 Practical Examples
-
-### Example 1: Testing Different Input Values
-
-```bash
-# Test with defaults (temporarily hide terraform.tfvars)
-mv terraform.tfvars terraform.tfvars.backup
-terraform plan
-# Shows: Environment = "staging", bucket will be "staging-my-terraform-bucket-xxxxx"
-
-# Test with terraform.tfvars
+# Uses default from variables.tf
 mv terraform.tfvars.backup terraform.tfvars
+
+# 2. Using terraform.tfvars (automatically loaded)
 terraform plan
-# Shows: Environment = "demo", bucket will be "demo-terraform-demo-bucket-xxxxx"
+# Uses values from terraform.tfvars
 
-# Test with command line override
-terraform plan -var="environment=test" -var="bucket_name=my-test-bucket"
-# Shows: Environment = "test", bucket will be "test-my-test-bucket-xxxxx"
-```
+# 3. Command Line Override (highest precedence)
+terraform plan -var="environment=production"
+# Overrides all other sources
 
-### Example 2: Viewing All Variable Types in Action
-
-```bash
-# Apply the configuration
-terraform apply -auto-approve
-
-# See all outputs (shows output variables)
-terraform output
-# bucket_arn = "arn:aws:s3:::demo-terraform-demo-bucket-abc123"
-# bucket_name = "demo-terraform-demo-bucket-abc123"
-# environment = "demo"                                # (input variable)
-# tags = {                                           # (local variable)
-#   "Environment" = "demo"
-#   "Owner" = "DevOps-Team"
-#   "Project" = "Terraform-Demo"
-# }
-
-# See how local variables computed the bucket name
-echo "Input: environment = $(terraform output -raw environment)"
-echo "Input: bucket_name = terraform-demo-bucket (from tfvars)"
-echo "Local: full_bucket_name = $(terraform output -raw bucket_name)"
-echo "Random suffix was added by local variable!"
-```
-
-### Example 3: Variable Precedence in Action
-
-```bash
-# Start with terraform.tfvars (environment = "demo")
-terraform plan | grep Environment
-# Shows: "Environment" = "demo"
-
-# Override with environment variable
+# 4. Environment Variables
 export TF_VAR_environment="from-env-var"
-terraform plan | grep Environment
-# Shows: "Environment" = "from-env-var"
+terraform plan
+# Uses environment variable
 
-# Override with command line (highest precedence)
-terraform plan -var="environment=from-command-line" | grep Environment
-# Shows: "Environment" = "from-command-line"
-
-# Clean up
-unset TF_VAR_environment
+# 5. Using Different tfvars Files
+terraform plan -var-file="dev.tfvars"
+terraform plan -var-file="production.tfvars"
 ```
 
 ---
 
-## 🔧 Try These Commands
+## 📁 File Structure
+
+```
+├── main.tf           # Resource definitions
+├── variables.tf      # Input variable declarations
+├── locals.tf         # Local variable definitions
+├── output.tf         # Output variable declarations
+├── provider.tf       # Provider configuration
+├── terraform.tfvars  # Default variable values
+└── README.md         # Documentation
+```
+
+---
+
+## 🔧 Common Commands
 
 ```bash
 # Initialize
@@ -343,10 +286,10 @@ terraform destroy
 
 ## 💡 Key Takeaways
 
-| Variable Type | Purpose |
-|--------------|---------|
-| **Input variables** | Parameterize your configuration |
-| **Local variables** | Compute and reuse values |
-| **Output variables** | Share results after deployment |
+| Variable Type | Purpose | Syntax |
+|--------------|---------|--------|
+| **Input variables** | Parameterize your configuration | `var.name` |
+| **Local variables** | Compute and reuse values internally | `local.name` |
+| **Output variables** | Export values after deployment | `output "name"` |
 
-**Precedence:** Command line > tfvars > environment vars > defaults
+**Variable Precedence:** `-var` > `-var-file` > `*.auto.tfvars` > `terraform.tfvars` > Environment vars > Defaults
