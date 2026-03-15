@@ -245,6 +245,50 @@ terraform-repo/
     └── ec2/
 ```
 
+> **Debate:** Duplicating `main.tf`, `variables.tf`, and `outputs.tf` across every environment folder causes drift and maintenance overhead. If your environments deploy the **same resources with different values**, the DRY approach below is preferred.
+
+### Simplified Single Root Module (Recommended for Most Teams)
+
+Use **one root module** + environment-specific `.tfvars` files. Git flow handles environment promotion — no folder duplication needed.
+
+```
+terraform-repo/
+├── main.tf           # Single source of truth for all resources
+├── variables.tf      # Declared once, valued per environment
+├── outputs.tf
+├── backend.tf
+├── provider.tf
+├── modules/
+│   ├── vpc/
+│   └── ec2/
+└── envs/
+    ├── dev.tfvars
+    ├── staging.tfvars
+    └── prod.tfvars
+```
+
+**Deploy per environment:**
+```bash
+terraform apply -var-file="envs/dev.tfvars"
+terraform apply -var-file="envs/prod.tfvars"
+```
+
+**Why this is better:**
+| Problem with Multi-Folder | Single Root Module Fix |
+|---|---|
+| Same resource defined 3 times | Defined once, reused everywhere |
+| Variable changes need updating in 3 places | Change once, applies to all envs |
+| Easy to have dev/staging/prod drift | Consistent by design |
+| More folders = more cognitive load | Clean, minimal structure |
+
+**State isolation** is achieved via separate backend keys, not separate folders:
+```hcl
+# envs/dev — backend key: "dev/terraform.tfstate"
+# envs/prod — backend key: "prod/terraform.tfstate"
+```
+
+> Use the multi-environment folder structure **only** when environments genuinely differ in architecture (e.g., prod has WAF + multi-AZ RDS, dev does not).
+
 ### Service-Based Structure
 ```
 infrastructure/
