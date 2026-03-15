@@ -272,3 +272,7 @@ modules/
 |---|---|
 | `hashicorp/aws` | `~> 6.0` |
 | `hashicorp/random` | `~> 3.1` |
+
+---
+
+![Terraform Project Structure](../../images/Structure.jfif)
